@@ -75,8 +75,8 @@ def get_task(task_id):
         print(f"An error occurred: {err}")
         return None
 
-def download_image(image_url, output_dir="output"):
-    """Download image from URL and save to output directory"""
+def download_image(image_url, output_dir="output", prompt=""):
+    """Download image from URL and save to output directory with prompt metadata"""
     # Create output directory if it doesn't exist
     os.makedirs(output_dir, exist_ok=True)
 
@@ -104,6 +104,11 @@ def download_image(image_url, output_dir="output"):
 
         with open(filepath, 'wb') as f:
             f.write(response.content)
+
+        # Save prompt metadata
+        metadata_file = filepath.rsplit('.', 1)[0] + '.txt'
+        with open(metadata_file, 'w', encoding='utf-8') as f:
+            f.write(prompt)
 
         print(f"Image downloaded successfully: {filepath}")
         return filepath
@@ -136,7 +141,7 @@ def process_task(task_id, prompt):
                 output_urls = task_status["result"].get("output", [])
                 if output_urls:
                     for url in output_urls:
-                        download_image(url)
+                        download_image(url, prompt=prompt)
 
                 task_results[task_id]["completed"] = True
                 task_results[task_id]["output_urls"] = output_urls
@@ -203,22 +208,43 @@ def task_status(task_id):
 @app.route('/images')
 def get_images():
     output_dir = "output"
-    image_files = []
+    prompt_groups = {}
 
     if os.path.exists(output_dir):
+        # Get all image files with their metadata
+        image_data = []
         for filename in os.listdir(output_dir):
             if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.bmp')):
                 filepath = os.path.join(output_dir, filename)
-                # Get the creation time of the file
                 creation_time = os.path.getctime(filepath)
-                image_files.append((filename, creation_time))
+
+                # Try to get prompt from metadata file
+                prompt = "Unknown prompt"
+                metadata_file = filepath.rsplit('.', 1)[0] + '.txt'
+                if os.path.exists(metadata_file):
+                    try:
+                        with open(metadata_file, 'r', encoding='utf-8') as f:
+                            prompt = f.read().strip()
+                    except:
+                        pass
+
+                image_data.append({
+                    'filename': filename,
+                    'creation_time': creation_time,
+                    'prompt': prompt
+                })
 
         # Sort by creation time (newest first)
-        image_files.sort(key=lambda x: x[1], reverse=True)
-        # Extract just the filenames after sorting
-        image_files = [filename for filename, creation_time in image_files]
+        image_data.sort(key=lambda x: x['creation_time'], reverse=True)
 
-    return jsonify({"images": image_files})
+        # Group by prompt
+        for item in image_data:
+            prompt = item['prompt']
+            if prompt not in prompt_groups:
+                prompt_groups[prompt] = []
+            prompt_groups[prompt].append(item['filename'])
+
+    return jsonify({"prompt_groups": prompt_groups})
 
 @app.route('/output/<filename>')
 def output_file(filename):

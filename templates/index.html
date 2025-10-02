@@ -133,12 +133,39 @@
             box-shadow: none;
         }
 
-        .image-grid {
-            column-count: 3;
-            column-gap: 20px;
-            margin-top: 15px;
+        .prompt-group {
+            margin-bottom: 40px;
             padding: 20px;
             padding-left: 40px; /* Additional left padding to ensure proper spacing from sidebar */
+        }
+
+        .prompt-text {
+            font-size: 1.1em;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 15px;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #007bff;
+        }
+
+        .image-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+        }
+
+        @media (max-width: 1200px) {
+            .image-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .image-grid {
+                grid-template-columns: 1fr;
+            }
         }
 
         .image-card {
@@ -147,8 +174,6 @@
             overflow: hidden;
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
             transition: transform 0.2s;
-            margin-bottom: 20px;
-            break-inside: avoid;
             width: 100%;
         }
 
@@ -159,7 +184,8 @@
 
         .image-card img {
             width: 100%;
-            height: auto;
+            height: 250px;
+            object-fit: cover;
             display: block;
         }
 
@@ -175,14 +201,12 @@
             overflow: hidden;
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
             background-color: #f0f0f0;
-            margin-bottom: 20px;
-            break-inside: avoid;
             width: 100%;
         }
 
         .skeleton-image {
             width: 100%;
-            height: 200px;
+            height: 250px;
             background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
             background-size: 200% 100%;
             animation: loading 1.5s infinite;
@@ -294,8 +318,8 @@
     <div class="main-content">
         <div class="container">
             <div class="images-section">
-                <div id="imageGrid" class="image-grid">
-                    <!-- Images will be loaded here dynamically -->
+                <div id="imageContainer">
+                    <!-- Images will be loaded here dynamically grouped by prompt -->
                 </div>
             </div>
         </div>
@@ -322,6 +346,41 @@
             spinnerDiv.classList.add('active');
             statusDiv.classList.remove('active', 'success', 'error');
 
+            // Get current prompt for skeleton cards
+            const currentPrompt = formData.get('prompt') || 'Generating image...';
+
+            // Add skeleton cards group
+            const imageContainer = document.getElementById('imageContainer');
+
+            // Create or find a skeleton prompt group
+            let skeletonGroup = document.getElementById('skeleton-group');
+            if (!skeletonGroup) {
+                skeletonGroup = document.createElement('div');
+                skeletonGroup.className = 'prompt-group';
+                skeletonGroup.id = 'skeleton-group';
+
+                const promptText = document.createElement('div');
+                promptText.className = 'prompt-text';
+                promptText.textContent = currentPrompt;
+                skeletonGroup.appendChild(promptText);
+
+                const skeletonGrid = document.createElement('div');
+                skeletonGrid.className = 'image-grid';
+                skeletonGrid.id = 'skeleton-grid';
+                skeletonGroup.appendChild(skeletonGrid);
+
+                // Insert at the beginning of container
+                imageContainer.insertBefore(skeletonGroup, imageContainer.firstChild);
+            } else {
+                // Update prompt text if it exists
+                const promptText = skeletonGroup.querySelector('.prompt-text');
+                if (promptText) {
+                    promptText.textContent = currentPrompt;
+                }
+            }
+
+            const skeletonGrid = document.getElementById('skeleton-grid');
+
             // Add multiple skeleton cards based on number of images requested
             currentSkeletonIds = []; // Clear previous skeleton IDs
             for (let i = 0; i < numImages; i++) {
@@ -338,8 +397,8 @@
                     </div>
                 `;
 
-                // Insert skeleton at the beginning of the grid
-                imageGrid.insertBefore(skeletonCard, imageGrid.firstChild);
+                // Insert skeleton at the beginning of the skeleton grid
+                skeletonGrid.insertBefore(skeletonCard, skeletonGrid.firstChild);
             }
 
             // Track how many tasks have completed
@@ -388,6 +447,15 @@
             const skeletonElement = document.getElementById(skeletonId);
             if (skeletonElement) {
                 skeletonElement.remove();
+            }
+
+            // Check if skeleton group is empty and remove it
+            const skeletonGroup = document.getElementById('skeleton-group');
+            if (skeletonGroup) {
+                const skeletonGrid = document.getElementById('skeleton-grid');
+                if (skeletonGrid && skeletonGrid.children.length === 0) {
+                    skeletonGroup.remove();
+                }
             }
         }
 
@@ -445,7 +513,7 @@
                 const response = await fetch('/images');
                 const result = await response.json();
 
-                const imageGrid = document.getElementById('imageGrid');
+                const imageContainer = document.getElementById('imageContainer');
 
                 // Remove any existing skeleton cards before loading new images
                 currentSkeletonIds.forEach(id => {
@@ -453,22 +521,45 @@
                 });
                 currentSkeletonIds = [];
 
-                imageGrid.innerHTML = '';
+                // Remove skeleton group if it exists
+                const skeletonGroup = document.getElementById('skeleton-group');
+                if (skeletonGroup) {
+                    skeletonGroup.remove();
+                }
 
-                if (result.images.length === 0) {
-                    imageGrid.innerHTML = '<p>No images found in the output folder.</p>';
+                imageContainer.innerHTML = '';
+
+                if (!result.prompt_groups || Object.keys(result.prompt_groups).length === 0) {
+                    imageContainer.innerHTML = '<p>No images found in the output folder.</p>';
                     return;
                 }
 
-                result.images.forEach(image => {
-                    const imageCard = document.createElement('div');
-                    imageCard.className = 'image-card';
+                // Create prompt groups
+                Object.entries(result.prompt_groups).forEach(([prompt, images]) => {
+                    const promptGroup = document.createElement('div');
+                    promptGroup.className = 'prompt-group';
 
-                    imageCard.innerHTML = `
-                        <img src="/output/${image}" alt="${image}">
-                    `;
+                    const promptText = document.createElement('div');
+                    promptText.className = 'prompt-text';
+                    promptText.textContent = prompt;
+                    promptGroup.appendChild(promptText);
 
-                    imageGrid.appendChild(imageCard);
+                    const imageGrid = document.createElement('div');
+                    imageGrid.className = 'image-grid';
+
+                    images.forEach(image => {
+                        const imageCard = document.createElement('div');
+                        imageCard.className = 'image-card';
+
+                        imageCard.innerHTML = `
+                            <img src="/output/${image}" alt="${image}">
+                        `;
+
+                        imageGrid.appendChild(imageCard);
+                    });
+
+                    promptGroup.appendChild(imageGrid);
+                    imageContainer.appendChild(promptGroup);
                 });
             } catch (error) {
                 console.error('Error loading images:', error);
