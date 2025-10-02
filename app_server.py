@@ -208,7 +208,15 @@ def get_images():
     if os.path.exists(output_dir):
         for filename in os.listdir(output_dir):
             if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.bmp')):
-                image_files.append(filename)
+                filepath = os.path.join(output_dir, filename)
+                # Get the creation time of the file
+                creation_time = os.path.getctime(filepath)
+                image_files.append((filename, creation_time))
+
+        # Sort by creation time (newest first)
+        image_files.sort(key=lambda x: x[1], reverse=True)
+        # Extract just the filenames after sorting
+        image_files = [filename for filename, creation_time in image_files]
 
     return jsonify({"images": image_files})
 
