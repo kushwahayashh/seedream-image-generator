@@ -1,3 +1,6 @@
+/* Import Space Mono font from Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap');
+
 /* CSS Variables */
 :root {
   --primary: #007bff;
@@ -30,7 +33,7 @@
 *, *::before, *::after { box-sizing: border-box; }
 
 body {
-  font-family: Arial, sans-serif;
+  font-family: 'Space Mono', monospace;
   margin: 0;
   padding: 0;
   background-color: var(--bg);
@@ -74,12 +77,14 @@ h1 {
   color: var(--text);
   text-align: center;
   margin-bottom: 20px;
+  font-family: 'Space Mono', monospace;
   font-size: 1.5em;
 }
 
 h2 {
   color: #555;
   margin-top: 0;
+  font-family: 'Space Mono', monospace;
   font-size: 1.2em;
 }
 
@@ -98,6 +103,7 @@ h2 {
 label {
   display: block;
   margin-bottom: 5px;
+  font-family: 'Space Mono', monospace;
   font-weight: bold;
   color: #555;
   font-size: .9em;
@@ -108,6 +114,7 @@ input, select, textarea {
   padding: 8px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
+  font-family: 'Space Mono', monospace;
   font-size: .9em;
 }
 
@@ -123,6 +130,7 @@ button {
   border: none;
   border-radius: var(--radius);
   cursor: pointer;
+  font-family: 'Space Mono', monospace;
   font-size: .9em;
   width: 100%;
   transition: background-color .2s;
@@ -138,6 +146,7 @@ button:hover {
   padding: 8px;
   border-radius: var(--radius);
   display: none;
+  font-family: 'Space Mono', monospace;
   font-size: .85em;
 }
 
@@ -207,6 +216,7 @@ button:hover {
 
 /* Metadata */
 .task-meta {
+  font-family: 'Space Mono', monospace;
   font-size: .85em;
   color: var(--text-mute);
   margin-bottom: 15px;
@@ -220,14 +230,14 @@ button:hover {
 }
 
 .task-id, .task-size {
-  font-family: monospace;
-  background: #e9ecef;
-  padding: 2px 6px;
-  border-radius: 3px;
+  font-family: 'Space Mono', monospace;
   font-size: .9em;
 }
 
-.task-date { color: var(--text-light); }
+.task-date { 
+  font-family: 'Space Mono', monospace;
+  color: var(--text-light); 
+}
 
 /* Grid */
 .image-grid {
