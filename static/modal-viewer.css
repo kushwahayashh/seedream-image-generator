@@ -31,7 +31,7 @@
 }
 
 .modal-image {
-  max-width: calc(95vw - 120px); /* Account for the buttons on both sides */
+  max-width: 90vw;
   max-height: 85vh;
   object-fit: contain;
   border-radius: 8px;
@@ -43,40 +43,15 @@
 .modal-nav {
   position: absolute;
   top: 50%;
-  width: 100%;
+  width: 100vw;
+  left: 50%;
+  transform: translate(-50%, -50%);
   display: flex;
   justify-content: space-between;
-  transform: translateY(-50%);
-  padding: 0 20px;
+  padding: 0 40px;
   box-sizing: border-box;
   z-index: 1002;
-}
-
-.nav-btn {
-  background: rgba(255, 255, 255, 0.2);
-  border: none;
-  color: white;
-  font-family: 'Space Mono', monospace;
-  font-size: 24px;
-  padding: 10px 15px;
-  border-radius: 50%;
-  cursor: pointer;
-  transition: background 0.3s ease;
-  width: 50px;
-  height: 50px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  backdrop-filter: blur(10px);
-}
-
-.nav-btn:hover {
-  background: rgba(255, 255, 255, 0.3);
-}
-
-.nav-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+  pointer-events: none;
 }
 
 .nav-btn {
@@ -97,6 +72,7 @@
   backdrop-filter: blur(10px);
   z-index: 1002;
   flex-shrink: 0; /* Prevent buttons from shrinking */
+  pointer-events: auto; /* Allow buttons to be clickable */
 }
 
 .nav-btn:hover {
