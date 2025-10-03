@@ -5,63 +5,76 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Image Generator</title>
     <link rel="stylesheet" href="/static/style.css">
+    <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
 </head>
 <body>
-    <div class="sidebar">
+    <div class="app-container">
+        <aside class="sidebar">
+            <div class="form-section">
+                <h2>Generate New Image</h2>
+                <form id="generateForm">
+                    <div class="form-group">
+                        <label for="prompt">Prompt:</label>
+                        <textarea 
+                            id="prompt" 
+                            name="prompt" 
+                            rows="3" 
+                            placeholder="Enter your image prompt..."
+                            required>a panda riding a skateboard on the moon, digital art</textarea>
+                    </div>
 
-        <div class="form-section">
-            <h2>Generate New Image</h2>
-            <form id="generateForm">
-                <div class="form-group">
-                    <label for="prompt">Prompt:</label>
-                    <textarea id="prompt" name="prompt" rows="3" placeholder="Enter your image prompt...">a panda riding a skateboard on the moon, digital art</textarea>
+                    <div class="form-group">
+                        <label for="aspect_ratio">Aspect Ratio:</label>
+                        <select id="aspect_ratio" name="aspect_ratio">
+                            <option value="1:1">1:1 (Square)</option>
+                            <option value="4:3" selected>4:3 (Standard)</option>
+                            <option value="16:9">16:9 (Widescreen)</option>
+                            <option value="9:16">9:16 (Portrait)</option>
+                            <option value="3:2">3:2 (Photo)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="size">Size:</label>
+                        <select id="size" name="size">
+                            <option value="2K" selected>2K</option>
+                            <option value="4K">4K</option>
+                            <option value="8K">8K</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="num_images">Number of Images:</label>
+                        <input 
+                            type="number" 
+                            id="num_images" 
+                            name="num_images" 
+                            value="1" 
+                            min="1" 
+                            max="4"
+                            required>
+                    </div>
+
+                    <button type="submit">Generate Image(s)</button>
+                </form>
+
+                <div id="statusMessage" class="status" role="alert" aria-live="polite"></div>
+                <div id="spinner" class="spinner">
+                    <div class="loading"></div>
+                    <span>Processing your request...</span>
                 </div>
-
-                <div class="form-group">
-                    <label for="aspect_ratio">Aspect Ratio:</label>
-                    <select id="aspect_ratio" name="aspect_ratio">
-                        <option value="1:1">1:1 (Square)</option>
-                        <option value="4:3" selected>4:3 (Standard)</option>
-                        <option value="16:9">16:9 (Widescreen)</option>
-                        <option value="9:16">9:16 (Portrait)</option>
-                        <option value="3:2">3:2 (Photo)</option>
-                    </select>
-                </div>
-
-
-                <div class="form-group">
-                    <label for="size">Size:</label>
-                    <select id="size" name="size">
-                        <option value="2K" selected>2K</option>
-                        <option value="4K">4K</option>
-                        <option value="8K">8K</option>
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label for="num_images">Number of Images:</label>
-                    <input type="number" id="num_images" name="num_images" value="1" min="1" max="4">
-                </div>
-
-                <button type="submit">Generate Image(s)</button>
-            </form>
-
-            <div id="statusMessage" class="status"></div>
-            <div id="spinner" class="spinner">
-                <div class="loading"></div>
-                <span>Processing your request...</span>
             </div>
-        </div>
-    </div>
+        </aside>
 
-    <div class="main-content">
-        <div class="container">
-            <div class="images-section">
-                <div id="imageContainer">
-                    <!-- Images will be loaded here dynamically grouped by prompt -->
-                </div>
+        <main class="main-content">
+            <div class="container">
+                <section class="images-section">
+                    <div id="imageContainer">
+                        <!-- Images will be loaded here dynamically grouped by prompt -->
+                    </div>
+                </section>
             </div>
-        </div>
+        </main>
     </div>
 
     <script src="/static/script.js"></script>
