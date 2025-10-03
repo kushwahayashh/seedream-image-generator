@@ -6,11 +6,72 @@ import time
 import os
 from urllib.parse import urlparse
 import threading
+from datetime import datetime
+import uuid
 
 app = Flask(__name__)
 
 # Global variable to store task status
 task_results = {}
+
+# JSON metadata file
+METADATA_FILE = "image_metadata.json"
+
+def load_image_metadata():
+    """Load image metadata from JSON file"""
+    if os.path.exists(METADATA_FILE):
+        try:
+            with open(METADATA_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"Error loading metadata: {e}")
+            return {"tasks": [], "last_updated": None}
+    return {"tasks": [], "last_updated": None}
+
+def save_image_metadata(metadata):
+    """Save image metadata to JSON file"""
+    try:
+        metadata["last_updated"] = datetime.now().isoformat()
+        with open(METADATA_FILE, 'w', encoding='utf-8') as f:
+            json.dump(metadata, f, indent=2, ensure_ascii=False)
+        return True
+    except Exception as e:
+        print(f"Error saving metadata: {e}")
+        return False
+
+def add_image_metadata(batch_id, filename, prompt, aspect_ratio="4:3", size="2K"):
+    """Add new image metadata to JSON file under a batch ID"""
+    metadata = load_image_metadata()
+
+    # Check if this batch_id already exists
+    existing_batch_index = None
+    for i, batch in enumerate(metadata.get("batches", [])):
+        if batch["id"] == batch_id:
+            existing_batch_index = i
+            break
+
+    if existing_batch_index is not None:
+        # Add image to existing batch
+        metadata["batches"][existing_batch_index]["images"].append(filename)
+        # Update the created_at to the latest time
+        metadata["batches"][existing_batch_index]["created_at"] = datetime.now().isoformat()
+    else:
+        # Create new batch
+        batch_entry = {
+            "id": batch_id,
+            "prompt": prompt,
+            "aspect_ratio": aspect_ratio,
+            "size": size,
+            "created_at": datetime.now().isoformat(),
+            "images": [filename]
+        }
+
+        if "batches" not in metadata:
+            metadata["batches"] = []
+        metadata["batches"].append(batch_entry)
+
+    save_image_metadata(metadata)
+    return batch_id
 
 def create_task(prompt, aspect_ratio="4:3", width=2048, height=2048, size="2K"):
     url = "https://api.vmodel.ai/api/tasks/v1/create"
@@ -75,8 +136,8 @@ def get_task(task_id):
         print(f"An error occurred: {err}")
         return None
 
-def download_image(image_url, output_dir="output", prompt=""):
-    """Download image from URL and save to output directory with prompt metadata"""
+def download_image(image_url, output_dir="output"):
+    """Download image from URL and save to output directory"""
     # Create output directory if it doesn't exist
     os.makedirs(output_dir, exist_ok=True)
 
@@ -105,13 +166,8 @@ def download_image(image_url, output_dir="output", prompt=""):
         with open(filepath, 'wb') as f:
             f.write(response.content)
 
-        # Save prompt metadata
-        metadata_file = filepath.rsplit('.', 1)[0] + '.txt'
-        with open(metadata_file, 'w', encoding='utf-8') as f:
-            f.write(prompt)
-
         print(f"Image downloaded successfully: {filepath}")
-        return filepath
+        return filename  # Return just the filename
 
     except requests.exceptions.HTTPError as http_err:
         print(f"HTTP error occurred while downloading image: {http_err}")
@@ -123,11 +179,11 @@ def download_image(image_url, output_dir="output", prompt=""):
         print(f"An error occurred while downloading image: {err}")
         return None
 
-def process_task(task_id, prompt):
+def process_task(task_id, prompt, aspect_ratio="4:3", size="2K", batch_id=None):
     """Run the task processing in a background thread"""
     global task_results
 
-    task_results[task_id] = {"status": "processing", "prompt": prompt}
+    task_results[task_id] = {"status": "processing", "prompt": prompt, "batch_id": batch_id}
 
     # Poll for task completion
     while True:
@@ -139,12 +195,19 @@ def process_task(task_id, prompt):
 
             if status == "succeeded":
                 output_urls = task_status["result"].get("output", [])
+                downloaded_files = []
+
                 if output_urls:
                     for url in output_urls:
-                        download_image(url, prompt=prompt)
+                        filename = download_image(url)
+                        if filename and batch_id:
+                            # Add each image to the batch
+                            add_image_metadata(batch_id, filename, prompt, aspect_ratio, size)
+                            downloaded_files.append(filename)
 
                 task_results[task_id]["completed"] = True
                 task_results[task_id]["output_urls"] = output_urls
+                task_results[task_id]["downloaded_files"] = downloaded_files
                 break
             elif status == "failed":
                 task_results[task_id]["completed"] = True
@@ -184,19 +247,28 @@ def generate():
     width = int(request.form.get('width', 2048))
     height = int(request.form.get('height', 2048))
     size = request.form.get('size', '2K')
+    num_images = int(request.form.get('num_images', 1))
 
-    task_result = create_task(prompt, aspect_ratio, width, height, size)
+    # Create a batch ID for this group of images
+    batch_id = str(uuid.uuid4())[:8]  # Shorter batch ID
+    task_ids = []
 
-    if task_result and "result" in task_result:
-        task_id = task_result["result"]["task_id"]
+    # Create multiple tasks for the requested number of images
+    for i in range(num_images):
+        task_result = create_task(prompt, aspect_ratio, width, height, size)
 
-        # Start background task processing
-        thread = threading.Thread(target=process_task, args=(task_id, prompt))
-        thread.start()
+        if task_result and "result" in task_result:
+            task_id = task_result["result"]["task_id"]
+            task_ids.append(task_id)
 
-        return jsonify({"status": "success", "task_id": task_id})
+            # Start background task processing with the batch ID
+            thread = threading.Thread(target=process_task, args=(task_id, prompt, aspect_ratio, size, batch_id))
+            thread.start()
+
+    if task_ids:
+        return jsonify({"status": "success", "batch_id": batch_id, "task_ids": task_ids})
     else:
-        return jsonify({"status": "error", "message": "Failed to create task"})
+        return jsonify({"status": "error", "message": "Failed to create any tasks"})
 
 @app.route('/task_status/<task_id>')
 def task_status(task_id):
@@ -207,44 +279,31 @@ def task_status(task_id):
 
 @app.route('/images')
 def get_images():
-    output_dir = "output"
-    prompt_groups = {}
+    # Load metadata from JSON file
+    metadata = load_image_metadata()
 
-    if os.path.exists(output_dir):
-        # Get all image files with their metadata
-        image_data = []
-        for filename in os.listdir(output_dir):
-            if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.bmp')):
-                filepath = os.path.join(output_dir, filename)
-                creation_time = os.path.getctime(filepath)
+    if not metadata.get("batches"):
+        return jsonify({"batches": []})
 
-                # Try to get prompt from metadata file
-                prompt = "Unknown prompt"
-                metadata_file = filepath.rsplit('.', 1)[0] + '.txt'
-                if os.path.exists(metadata_file):
-                    try:
-                        with open(metadata_file, 'r', encoding='utf-8') as f:
-                            prompt = f.read().strip()
-                    except:
-                        pass
+    # Filter batches to only include those with existing image files
+    valid_batches = []
+    for batch in metadata.get("batches", []):
+        valid_images = []
+        for filename in batch.get("images", []):
+            # Only include if the image file actually exists
+            if os.path.exists(os.path.join("output", filename)):
+                valid_images.append(filename)
 
-                image_data.append({
-                    'filename': filename,
-                    'creation_time': creation_time,
-                    'prompt': prompt
-                })
+        # Only add the batch if it has valid images
+        if valid_images:
+            batch_copy = batch.copy()
+            batch_copy["images"] = valid_images
+            valid_batches.append(batch_copy)
 
-        # Sort by creation time (newest first)
-        image_data.sort(key=lambda x: x['creation_time'], reverse=True)
+    # Sort batches by creation time (newest first)
+    sorted_batches = sorted(valid_batches, key=lambda x: x["created_at"], reverse=True)
 
-        # Group by prompt
-        for item in image_data:
-            prompt = item['prompt']
-            if prompt not in prompt_groups:
-                prompt_groups[prompt] = []
-            prompt_groups[prompt].append(item['filename'])
-
-    return jsonify({"prompt_groups": prompt_groups})
+    return jsonify({"batches": sorted_batches})
 
 @app.route('/output/<filename>')
 def output_file(filename):
